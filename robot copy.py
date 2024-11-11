@@ -55,8 +55,6 @@ class ARAP:
         self.distance_sensors = []
         self.distance_sensors_values = []
         self.distance_range = 0.0
-        #self.ground_sensors = []
-        #self.ground_sensors_values = [0.0, 0.0, 0.0]
         self.leds = []
         self.leds_values = []  # values: 0 - 255
         self.speeds = [0.0, 0.0]
@@ -85,6 +83,7 @@ class ARAP:
         
         # Run init methods
         self.init_devices()
+
 
     def init_devices(self):
         # Distance sensors initialisation
@@ -181,92 +180,68 @@ class ARAP:
     def step(self):
         if self.robot.step(self.get_time_step()) == -1:
             sys.exit(0)
-    
+                
     def get_camera_image(self, interval):
-        width = self.camera.getWidth()
-        height = self.camera.getHeight()
+        width, height = self.camera.getWidth(), self.camera.getHeight()
         image = self.camera.getImage()
-        
-        # Capture new image after interval (no. of steps) has passed
+        avg_red, avg_green, avg_blue = 0, 0, 0  # Initialize with default values
+    
+        # Process the image at specified intervals
         if self.camera_interval >= interval:
-            self.red = 0
-            self.green = 0
-            self.blue = 0
-
-            # Sum RGB values for all pixels
+            total_red, total_green, total_blue = 0, 0, 0
+    
+            # Accumulate RGB values across pixels
             for x in range(width):
                 for y in range(height):
-                    self.red += self.camera.imageGetRed(image, self.camera.getWidth(), x, y)
-                    self.green += self.camera.imageGetGreen(image, self.camera.getWidth(), x, y)
-                    self.blue += self.camera.imageGetBlue(image, self.camera.getWidth(), x, y)
-
-            # Normalize RGB values by the total number of pixels
+                    total_red += self.camera.imageGetRed(image, width, x, y)
+                    total_green += self.camera.imageGetGreen(image, width, x, y)
+                    total_blue += self.camera.imageGetBlue(image, width, x, y)
+    
+            # Calculate average color intensities
             total_pixels = width * height
-            self.red = self.red / total_pixels
-            self.green = self.green / total_pixels
-            self.blue = self.blue / total_pixels
-
-            # Normalize the values to a scale of 0 to 1 (assuming RGB values are from 0 to 255)
-            max_color_value = 255.0
-            norm_red = self.red / max_color_value
-            norm_green = self.green / max_color_value
-            norm_blue = self.blue / max_color_value
-
-            # Determine dominant color by comparing normalized values
-            color_ratio_threshold = 0.1  # Threshold to ensure the difference is significant
-
-            if norm_red > norm_green + color_ratio_threshold and norm_red > norm_blue + color_ratio_threshold:
-                if not self.seen_red:
-                    print("Red box identified!\n")
-                    print()
-                    self.seen_red = True
+            avg_red = total_red / total_pixels / 255.0
+            avg_green = total_green / total_pixels / 255.0
+            avg_blue = total_blue / total_pixels / 255.0
+    
+            # Threshold to identify dominant color
+            color_threshold = 0.1
+    
+            # Check for red color dominance
+            if avg_red > avg_green + color_threshold and avg_red > avg_blue + color_threshold:
                 if not self.red_in_sight:
+                    if not self.seen_red:
+                        print("Successfully Identified the Red Box!")
+                        self.seen_red = True
                     self.red_tally += 1
-                    print(f"red: {self.red_tally}, blue: {self.blue_tally}, green: {self.green_tally}\n")
-                    print()
-                    self.red_in_sight = True
-                self.blue_in_sight = False
-                self.green_in_sight = False
-               
-
-            elif norm_green > norm_red + color_ratio_threshold and norm_green > norm_blue + color_ratio_threshold:
-                if not self.seen_green:
-                    print("Green box identified!\n")
-                    print()
-                    self.seen_green = True
+                    print(f"Total Identifications [Red: {self.red_tally}, Blue: {self.blue_tally}, Green: {self.green_tally}]\n")
+                self.red_in_sight, self.green_in_sight, self.blue_in_sight = True, False, False
+    
+            # Check for green color dominance
+            elif avg_green > avg_red + color_threshold and avg_green > avg_blue + color_threshold:
                 if not self.green_in_sight:
+                    if not self.seen_green:
+                        print("Successfully Identified the Green Box!")
+                        self.seen_green = True
                     self.green_tally += 1
-                    print(f"red: {self.red_tally}, blue: {self.blue_tally}, green: {self.green_tally}\n")
-                    print()
-                    self.green_in_sight = True
-                self.red_in_sight = False
-                self.blue_in_sight = False
-                
-
-            elif norm_blue > norm_red + color_ratio_threshold and norm_blue > norm_green + color_ratio_threshold:
-                if not self.seen_blue:
-                    print("Blue box identified!\n")
-                    print()
-                    self.seen_blue = True
+                    print(f"Total Identifications [Red: {self.red_tally}, Blue: {self.blue_tally}, Green: {self.green_tally}]\n")
+                self.red_in_sight, self.green_in_sight, self.blue_in_sight = False, True, False
+    
+            # Check for blue color dominance
+            elif avg_blue > avg_red + color_threshold and avg_blue > avg_green + color_threshold:
                 if not self.blue_in_sight:
+                    if not self.seen_blue:
+                        print("Successfully Identified the Blue Box!")
+                        self.seen_blue = True
                     self.blue_tally += 1
-                    print(f"red: {self.red_tally}, blue: {self.blue_tally}, green: {self.green_tally}\n")
-                    print()
-                    self.blue_in_sight = True
-                self.red_in_sight = False
-                self.green_in_sight = False
-                
-
+                    print(f"Total Identifications [Red: {self.red_tally}, Blue: {self.blue_tally}, Green: {self.green_tally}]\n")
+                self.red_in_sight, self.green_in_sight, self.blue_in_sight = False, False, True
+    
+            # Reset camera interval
             self.camera_interval = 0
         else:
-            self.red = 0
-            self.green = 0
-            self.blue = 0
             self.camera_interval += 1
-
-        return self.red, self.green, self.blue
-
-          
+    
+        return avg_red, avg_green, avg_blue
     
     #def ground_obstacles_detected(self):
     #    for i in range(self.GROUND_SENSORS_NUMBER):
