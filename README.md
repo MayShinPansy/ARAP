@@ -1,4 +1,4 @@
-sc# Intelligent Robotics & AI System
+# Intelligent Robotics & AI System
 
 ### (CNN Image Classification + Autonomous Robot in Webots)
 
